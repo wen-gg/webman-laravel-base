@@ -1,0 +1,35 @@
+{
+  "name": "wen-gg/webman-laravel-base",
+  "type": "library",
+  "license": "MIT",
+  "description": "适用于webman的laravel基础支持",
+  "require": {
+    "vlucas/phpdotenv": "^5.0",
+    "ramsey/uuid": "^4.0",
+    "doctrine/dbal": "^3.2",
+    "illuminate/database": ">=7.30",
+    "illuminate/pagination": ">=7.30",
+    "illuminate/events": ">=7.30",
+    "illuminate/redis": ">=7.30",
+    "illuminate/cache": ">=7.30"
+  },
+  "autoload": {
+    "psr-4": {
+      "Wengg\\WebmanLaravelBase\\": "src"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  },
+  "authors": [
+    {
+      "name": "mosquito",
+      "email": "zwj1206_hi@163.com"
+    }
+  ],
+  "keywords": [
+    "webman",
+    "laravel",
+    "base"
+  ]
+}
