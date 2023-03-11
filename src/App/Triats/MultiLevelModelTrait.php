@@ -16,14 +16,14 @@ trait MultiLevelModelTrait
     protected static $_multiLevelMap = [
         'id' => 'id',
         'pid' => 'pid',
-        'pid_path' => 'pid_path',
+        'pid_path' => 'pid_path', //为null表示无该字段
     ];
 
     /**
      * 设置列信息
      * @author mosquito <zwj1206_hi@163.com>
      */
-    public static function setMapColumn(string $id, string $pid, string $pid_path)
+    public static function setMapColumn(string $id, string $pid, string $pid_path = null)
     {
         static::$_multiLevelMap = [
             'id' => $id,
@@ -99,11 +99,23 @@ trait MultiLevelModelTrait
         }
         //
         $parents = collect();
-        $path_arr = json_decode($item->{static::getPidPathColumn()}, true) ?: [];
-        if ($path_arr) {
-            $parents = static::whereIn(static::getIdColumn(), $path_arr)
-                ->orderByRaw("field(" . static::getIdColumn() . "," . implode(',', $path_arr) . ")")
-                ->get();
+        if (is_null(static::getPidPathColumn())) {
+            $parent_func = function ($item) use (&$parent_func, &$parents) {
+                $parent = $item->parent;
+                $item->unsetRelation('parent');
+                if ($parent && $parent->{static::getIdColumn()}) {
+                    $parents->prepend($parent);
+                    $parent_func($parent);
+                }
+            };
+            $parent_func($item);
+        } else {
+            $path_arr = is_array($item->{static::getPidPathColumn()}) ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
+            if ($path_arr) {
+                $parents = static::whereIn(static::getIdColumn(), $path_arr)
+                    ->orderByRaw("field(" . static::getIdColumn() . "," . implode(',', $path_arr) . ")")
+                    ->get();
+            }
         }
         return $self ? $parents->push($item) : $parents;
     }
@@ -125,10 +137,26 @@ trait MultiLevelModelTrait
         if (!$item) {
             return collect();
         }
+
         //
-        $children = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
-            ->orderByRaw("json_length(" . static::getPidPathColumn() . ")")
-            ->get();
+        $children = collect();
+        if (is_null(static::getPidPathColumn())) {
+            $child_func = function ($item) use (&$child_func, &$children) {
+                $childList = $item->children;
+                $item->unsetRelation('children');
+                foreach ($childList as $child) {
+                    $children->push($child);
+                }
+                foreach ($childList as $child) {
+                    $child_func($child);
+                }
+            };
+            $child_func($item);
+        } else {
+            $children = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
+                ->orderByRaw("json_length(" . static::getPidPathColumn() . ")")
+                ->get();
+        }
         return $self ? $children->prepend($item) : $children;
     }
 
@@ -158,6 +186,7 @@ trait MultiLevelModelTrait
             $pid = intval($item->{static::getPidColumn()});
         } elseif (is_numeric($parent)) {
             $pid = intval($parent);
+            $parent = null;
         } else {
             throw new \Exception('父级信息错误');
         }
@@ -169,20 +198,27 @@ trait MultiLevelModelTrait
         }
 
         //更新当前项
-        $old_path_arr = json_decode($item->{static::getPidPathColumn()}, true) ?: [];
-        if ($pid == 0) {
-            $item->{static::getPidColumn()} = 0;
-            $item->{static::getPidPathColumn()} = null;
-        } else {
-            $path_arr = json_decode($parent->{static::getPidPathColumn()}, true) ?: [];
-            array_push($path_arr, $parent->{static::getIdColumn()});
-            if (in_array($item->{static::getIdColumn()}, $path_arr)) {
-                throw new \Exception('父级信息不能是当前项的子级');
+        if (is_null(static::getPidPathColumn())) {
+            if ($pid == 0) {
+                $item->{static::getPidColumn()} = 0;
+            } else {
+                $item->{static::getPidColumn()} = $parent->{static::getIdColumn()};
             }
-            $item->{static::getPidColumn()} = $parent->{static::getIdColumn()};
-            $item->{static::getPidPathColumn()} = json_encode($path_arr);
+        } else {
+            $old_path_arr = is_array($item->{static::getPidPathColumn()}) ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
+            if ($pid == 0) {
+                $item->{static::getPidColumn()} = 0;
+                $item->{static::getPidPathColumn()} = null;
+            } else {
+                $path_arr = is_array($parent->{static::getPidPathColumn()}) ? $parent->{static::getPidPathColumn()} : (json_decode($parent->{static::getPidPathColumn()}, true) ?: []);
+                array_push($path_arr, $parent->{static::getIdColumn()});
+                if (in_array($item->{static::getIdColumn()}, $path_arr)) {
+                    throw new \Exception('父级信息不能是当前项的子级');
+                }
+                $item->{static::getPidColumn()} = $parent->{static::getIdColumn()};
+                $item->{static::getPidPathColumn()} = is_array($item->{static::getPidPathColumn()}) ? $path_arr : json_encode($path_arr);
+            }
         }
-        //
         if ($item->isDirty()) {
             $temp = $item->save();
             if ($temp === false) {
@@ -191,28 +227,30 @@ trait MultiLevelModelTrait
         }
 
         //更新当前项子级
-        $new_path_arr = json_decode($item->{static::getPidPathColumn()}, true) ?: [];
-        if ($old_path_arr != $new_path_arr) {
-            $new_path_sql = static::getPidPathColumn();
-            if ($old_path_arr) {
-                $json_remove_arr = array_pad([], count($old_path_arr), '"$[0]"');
-                $new_path_sql = 'JSON_REMOVE(`' . static::getPidPathColumn() . '`, ' . implode(',', $json_remove_arr) . ')';
-            }
-            if ($new_path_arr) {
-                $new_path_arr = array_reverse($new_path_arr);
-                $new_path_sql = 'JSON_ARRAY_INSERT(' . $new_path_sql;
-                foreach ($new_path_arr as $cpath) {
-                    $new_path_sql .= ', "$[0]", ' . $cpath;
+        if (!is_null(static::getPidPathColumn())) {
+            $new_path_arr = is_array($item->{static::getPidPathColumn()}) ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
+            if ($old_path_arr != $new_path_arr) {
+                $new_path_sql = static::getPidPathColumn();
+                if ($old_path_arr) {
+                    $json_remove_arr = array_pad([], count($old_path_arr), '"$[0]"');
+                    $new_path_sql = 'JSON_REMOVE(`' . static::getPidPathColumn() . '`, ' . implode(',', $json_remove_arr) . ')';
                 }
-                $new_path_sql .= ')';
-            }
-            //
-            $temp = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
-                ->update([
-                    static::getPidPathColumn() => \support\Db::raw($new_path_sql),
-                ]);
-            if ($temp === false) {
-                throw new \Exception('更新当前项子级失败');
+                if ($new_path_arr) {
+                    $new_path_arr = array_reverse($new_path_arr);
+                    $new_path_sql = 'JSON_ARRAY_INSERT(' . $new_path_sql;
+                    foreach ($new_path_arr as $cpath) {
+                        $new_path_sql .= ', "$[0]", ' . $cpath;
+                    }
+                    $new_path_sql .= ')';
+                }
+                //
+                $temp = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
+                    ->update([
+                        static::getPidPathColumn() => \support\Db::raw($new_path_sql),
+                    ]);
+                if ($temp === false) {
+                    throw new \Exception('更新当前项子级失败');
+                }
             }
         }
     }
