@@ -2,14 +2,12 @@
 
 namespace Wengg\WebmanLaravelBase\App\Triats;
 
-use Wengg\WebmanLaravelBase\App\Casts\ArrayCasts;
-
 /**
- * 多层级模型复用，适用于laravel
+ * 多层级模型复用（细粒度型），适用于laravel
  * @mixin \Wengg\WebmanLaravelBase\App\Model\BModel
  * @author mosquito <zwj1206_hi@163.com>
  */
-trait MultiLevelModelTrait
+trait MultiLevelXsModelTrait
 {
     /**
      * 索引对照
@@ -18,19 +16,20 @@ trait MultiLevelModelTrait
     protected static $_multiLevelMap = [
         'id' => 'id',
         'pid' => 'pid',
-        'pid_path' => 'pid_path', //为null表示无该字段
+        'level' => 'level',
     ];
+    protected static $_multiLevelMin = 1;
 
     /**
      * 设置列信息
      * @author mosquito <zwj1206_hi@163.com>
      */
-    public static function setMapColumn(string $id, string $pid, string $pid_path = null)
+    public static function setMapColumn(string $id, string $pid, string $level)
     {
         static::$_multiLevelMap = [
             'id' => $id,
             'pid' => $pid,
-            'pid_path' => $pid_path,
+            'level' => $level,
         ];
     }
 
@@ -55,13 +54,13 @@ trait MultiLevelModelTrait
     }
 
     /**
-     * 获取pid_path列
+     * 获取level列
      * @return string
      * @author mosquito <zwj1206_hi@163.com>
      */
-    public static function getPidPathColumn()
+    public static function getLevelColumn()
     {
-        return static::$_multiLevelMap['pid_path'];
+        return static::$_multiLevelMap['level'];
     }
 
     /**
@@ -70,7 +69,7 @@ trait MultiLevelModelTrait
      */
     public function parent()
     {
-        return $this->belongsTo(static::class, static::getPidColumn(), static::getIdColumn());
+        return $this->belongsTo(static::class, static::getPidColumn(), static::getIdColumn())->where(static::getLevelColumn(), static::$_multiLevelMin);
     }
 
     /**
@@ -79,7 +78,7 @@ trait MultiLevelModelTrait
      */
     public function children()
     {
-        return $this->hasMany(static::class, static::getPidColumn(), static::getIdColumn());
+        return $this->hasMany(static::class, static::getPidColumn(), static::getIdColumn())->where(static::getLevelColumn(), static::$_multiLevelMin);
     }
 
     /**
@@ -97,7 +96,7 @@ trait MultiLevelModelTrait
             if ($item <= 0) {
                 return collect();
             }
-            $item = static::where(static::getIdColumn(), $item)->first();
+            $item = static::where(static::getIdColumn(), $item)->where(static::getLevelColumn(), static::$_multiLevelMin)->first();
         }
         if (!$item) {
             return collect();
@@ -105,27 +104,12 @@ trait MultiLevelModelTrait
 
         //
         $parents = collect();
-        if (is_null(static::getPidPathColumn())) {
-            $parent_func = function ($item) use (&$parent_func, &$parents) {
-                $parent = $item->parent;
-                $item->unsetRelation('parent');
-                if ($parent && $parent->{static::getIdColumn()}) {
-                    $parents->prepend($parent);
-                    $parent_func($parent);
-                }
-            };
-            $parent_func($item);
-        } else {
-            $pid_path_array = false;
-            if ($item->hasCast(static::getPidPathColumn(), strtolower(ArrayCasts::class))) {
-                $pid_path_array = true;
-            }
-            $path_arr = $pid_path_array ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
-            if ($path_arr) {
-                $parents = static::whereIn(static::getIdColumn(), $path_arr)
-                    ->orderByRaw("field(" . static::getIdColumn() . "," . implode(',', $path_arr) . ")")
-                    ->get();
-            }
+        $path_arr = static::where(static::getIdColumn(), $item->{static::getIdColumn()})->where(static::getPidColumn(), '>', 0)->orderBy(static::getLevelColumn(), 'desc')->pluck(static::getPidColumn())->toArray();
+        if ($path_arr) {
+            $parents = static::whereIn(static::getIdColumn(), $path_arr)
+                ->where(static::getLevelColumn(), static::$_multiLevelMin)
+                ->orderByRaw("field(" . static::getIdColumn() . "," . implode(',', $path_arr) . ")")
+                ->get();
         }
         return $self ? $parents->push($item) : $parents;
     }
@@ -145,7 +129,7 @@ trait MultiLevelModelTrait
             if ($item <= 0) {
                 return collect();
             }
-            $item = static::where(static::getIdColumn(), $item)->first();
+            $item = static::where(static::getIdColumn(), $item)->where(static::getLevelColumn(), static::$_multiLevelMin)->first();
         }
         if (!$item) {
             return collect();
@@ -153,21 +137,11 @@ trait MultiLevelModelTrait
 
         //
         $children = collect();
-        if (is_null(static::getPidPathColumn())) {
-            $child_func = function ($item) use (&$child_func, &$children) {
-                $childList = $item->children;
-                $item->unsetRelation('children');
-                foreach ($childList as $child) {
-                    $children->push($child);
-                }
-                foreach ($childList as $child) {
-                    $child_func($child);
-                }
-            };
-            $child_func($item);
-        } else {
-            $children = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
-                ->orderByRaw("json_length(" . static::getPidPathColumn() . ")")
+        $path_arr = static::where(static::getPidColumn(), $item->{static::getIdColumn()})->orderBy(static::getLevelColumn())->pluck(static::getIdColumn())->toArray();
+        if ($path_arr) {
+            $children = static::whereIn(static::getIdColumn(), $path_arr)
+                ->where(static::getLevelColumn(), static::$_multiLevelMin)
+                ->orderByRaw("field(" . static::getIdColumn() . "," . implode(',', $path_arr) . ")")
                 ->get();
         }
         return $self ? $children->prepend($item) : $children;
@@ -188,7 +162,7 @@ trait MultiLevelModelTrait
             if ($item <= 0) {
                 throw new \Exception("获取当前项失败");
             }
-            $item = static::where(static::getIdColumn(), $item)->first();
+            $item = static::where(static::getIdColumn(), $item)->where(static::getLevelColumn(), static::$_multiLevelMin)->first();
         }
         if (!$item) {
             throw new \Exception('获取当前项失败');
@@ -202,6 +176,7 @@ trait MultiLevelModelTrait
             $pid = $item->{static::getPidColumn()};
         } elseif (is_numeric($parent)) {
             $pid = intval($parent);
+            $parent = null;
         } else {
             throw new \Exception('父级信息错误');
         }
@@ -224,50 +199,48 @@ trait MultiLevelModelTrait
 
         //更新当前项
         $item->{static::getPidColumn()} = $pid;
-        if (!is_null(static::getPidPathColumn())) {
-            $pid_path_array = false;
-            if ($item->hasCast(static::getPidPathColumn(), strtolower(ArrayCasts::class))) {
-                $pid_path_array = true;
-            }
-            $old_path_arr = $pid_path_array ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
-            if ($pid == 0) {
-                $item->{static::getPidPathColumn()} = null;
-            } else {
-                $item->{static::getPidPathColumn()} = $pid_path_array ? $parents_ids : json_encode($parents_ids);
-            }
-        }
         if ($item->isDirty()) {
             $temp = $item->save();
             if ($temp === false) {
                 throw new \Exception('更新当前项失败');
             }
 
-            //更新当前项子级
-            if (!is_null(static::getPidPathColumn())) {
-                $new_path_arr = $pid_path_array ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
-                if ($old_path_arr != $new_path_arr) {
-                    $new_path_sql = static::getPidPathColumn();
-                    if ($old_path_arr) {
-                        $json_remove_arr = array_pad([], count($old_path_arr), '"$[0]"');
-                        $new_path_sql = 'JSON_REMOVE(`' . static::getPidPathColumn() . '`, ' . implode(',', $json_remove_arr) . ')';
-                    }
-                    if ($new_path_arr) {
-                        $new_path_arr = array_reverse($new_path_arr);
-                        $new_path_sql = 'JSON_ARRAY_INSERT(' . $new_path_sql;
-                        foreach ($new_path_arr as $cpath) {
-                            $new_path_sql .= ', "$[0]", ' . $cpath;
-                        }
-                        $new_path_sql .= ')';
-                    }
-                    //
-                    $temp = static::whereJsonContains(static::getPidPathColumn(), $item->{static::getIdColumn()})
-                        ->update([
-                            static::getPidPathColumn() => \support\Db::raw($new_path_sql),
-                        ]);
-                    if ($temp === false) {
-                        throw new \Exception('更新当前项子级失败');
-                    }
+            //
+            $parents_arr = [];
+            $branch_func = function (self $item) use (&$parents_arr) {
+                //
+                static::where(static::getIdColumn(), $item->{static::getIdColumn()})->where(static::getLevelColumn(), '>', static::$_multiLevelMin)->delete();
+                if (!isset($parents_arr[$item->{static::getPidColumn()}])) {
+                    $parents = $item->{static::getPidColumn()} > 0 ? static::getAllParentList($item->parent, false)->reverse() : collect();
+                    $parents_arr[$item->{static::getPidColumn()}] = $parents;
+                } else {
+                    $parents = $parents_arr[$item->{static::getPidColumn()}];
                 }
+                $item_arr = [];
+                $item->unsetRelation('parent');
+                $old_val = $item->toArray();
+                foreach ($parents as $value) {
+                    $val = array_merge($old_val, [
+                        static::getPidColumn() => $value->{static::getIdColumn()},
+                        static::getLevelColumn() => $item->{static::getLevelColumn()}+1 + count($item_arr),
+                    ]);
+                    $item_arr[] = $val;
+                }
+                $val = array_merge($old_val, [
+                    static::getPidColumn() => 0,
+                    static::getLevelColumn() => $item->{static::getLevelColumn()}+1 + count($item_arr),
+                ]);
+                $item_arr[] = $val;
+                if ($item_arr) {
+                    static::insert($item_arr);
+                }
+            };
+            $branch_func($item);
+
+            //更新当前项子级
+            $children = static::getAllChildrenList($item, false);
+            foreach ($children as $child) {
+                $branch_func($child);
             }
         }
     }
