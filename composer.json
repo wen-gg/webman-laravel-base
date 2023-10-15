@@ -7,11 +7,11 @@
     "vlucas/phpdotenv": "^5.0",
     "ramsey/uuid": "^4.0",
     "doctrine/dbal": "^3.2",
-    "illuminate/database": ">=7.30",
-    "illuminate/pagination": ">=7.30",
-    "illuminate/events": ">=7.30",
-    "illuminate/redis": ">=7.30",
-    "illuminate/cache": ">=7.30"
+    "illuminate/database": "*",
+    "illuminate/pagination": "*",
+    "illuminate/events": "*",
+    "illuminate/redis": "*",
+    "illuminate/cache": "*"
   },
   "autoload": {
     "psr-4": {
