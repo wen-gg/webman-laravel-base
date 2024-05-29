@@ -1,0 +1,31 @@
+{
+    "name": "wen-gg/webman-laravel-base",
+    "description": "适用于webman的laravel基础扩展",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "WenGg\\WebmanLaravelBase\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "mosquito",
+            "email": "zwj1206_hi@163.com"
+        }
+    ],
+    "require": {
+        "vlucas/phpdotenv": "*",
+        "ramsey/uuid": "*",
+        "doctrine/dbal": "*",
+        "illuminate/database": "*",
+        "illuminate/pagination": "*",
+        "illuminate/events": "*",
+        "illuminate/redis": "*",
+        "illuminate/cache": "*",
+        "workerman/webman-framework": "*"
+    }
+}
