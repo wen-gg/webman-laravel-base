@@ -10,24 +10,19 @@ trait ConfigTrait
 {
     /**
      * 配置格式化
-     * @return array|string
      * @author mosquito <zwj1206_hi@163.com>
      * @deprecated v1.0.1
      */
-    protected static function configFormat(array $arr, string $key = null, bool $transform = false)
+    protected static function configFormat(array $arr, $key = null, bool $transform = false)
     {
         return static::configFormatNew($arr, $key, $transform === true ? 'key' : null, $transform === true ? 'value' : null);
     }
 
     /**
      * 配置格式化
-     * @param array $arr
-     * @param mixed $key
-     * @param string|null $keyName
-     * @param string|null $valueName
      * @author mosquito <zwj1206_hi@163.com>
      */
-    protected static function configFormatNew(array $arr, mixed $key = null, string $keyName = null, string $valueName = null)
+    protected static function configFormatNew(array $arr, $key = null, string $keyName = null, string $valueName = null)
     {
         $result = null;
         if (is_null($key)) {
