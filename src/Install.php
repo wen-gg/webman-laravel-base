@@ -11,6 +11,7 @@ class Install
      */
     protected static $pathRelation = array(
         'config/plugin/wen-gg/webman-laravel-base' => 'config/plugin/wen-gg/webman-laravel-base',
+        'lang' => 'resource/translations',
     );
 
     /**

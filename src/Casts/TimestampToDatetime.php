@@ -14,7 +14,7 @@ class TimestampToDatetime implements CastsAttributes
      */
     public function get(Model $model, string $key, mixed $value, array $attributes): mixed
     {
-        return is_numeric($value) ? date('Y-m-d H:i:s', $value) : $value;
+        return is_numeric($value) ? ($value > 0 ? date('Y-m-d H:i:s', $value) : '') : $value;
     }
 
     /**
@@ -24,6 +24,6 @@ class TimestampToDatetime implements CastsAttributes
      */
     public function set(Model $model, string $key, mixed $value, array $attributes): mixed
     {
-        return is_numeric($value) ? $value : strtotime($value);
+        return is_numeric($value) ? $value : (strtotime($value) ?: 0);
     }
 }

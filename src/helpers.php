@@ -1,5 +1,20 @@
 <?php
 
+if (!function_exists('validator')) {
+    /**
+     * Create a new Validator instance.
+     * @return \Illuminate\Contracts\Validation\Validator|\Illuminate\Contracts\Validation\Factory
+     */
+    function validator(array $data = [], array $rules = [], array $messages = [], array $customAttributes = [])
+    {
+        $factory = new \WenGg\WebmanLaravelBase\Factories\ValidatorFactory();
+        if (func_num_args() === 0) {
+            return $factory;
+        }
+        return $factory->make($data, $rules, $messages, $customAttributes);
+    }
+}
+
 if (!function_exists('laravel_batch_update')) {
     /**
      * laravel数据库单表批量更新，适用于laravel

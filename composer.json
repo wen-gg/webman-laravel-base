@@ -21,11 +21,20 @@
         "vlucas/phpdotenv": "*",
         "ramsey/uuid": "*",
         "doctrine/dbal": "*",
-        "illuminate/database": "*",
+        "workerman/webman-framework": "*",
+        "webman/console": "*",
+        "webman/log": "*",
+        "webman/gateway-worker": "*",
+        "webman/database": "*",
+        "webman/redis": "*",
+        "webman/redis-queue": "*",
+        "webman/cache": "*",
+        "webman/cors": "*",
+        "webman/rate-limiter": "*",
         "illuminate/pagination": "*",
         "illuminate/events": "*",
-        "illuminate/redis": "*",
-        "illuminate/cache": "*",
-        "workerman/webman-framework": "*"
+        "illuminate/validation": "*",
+        "laravel/serializable-closure": "*",
+        "wen-gg/helpers": "*"
     }
 }
