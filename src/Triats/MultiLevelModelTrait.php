@@ -118,7 +118,7 @@ trait MultiLevelModelTrait
             $parent_func($item);
         } else {
             $pid_path_array = false;
-            if ($item->hasCast(static::getPidPathColumn(), strtolower(Arr::class))) {
+            if ($item->hasCast(static::getPidPathColumn(), strtolower(Arr::class)) || $item->hasCast(static::getPidPathColumn(), Arr::class)) {
                 $pid_path_array = true;
             }
             $path_arr = $pid_path_array ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
@@ -227,7 +227,7 @@ trait MultiLevelModelTrait
         $item->{static::getPidColumn()} = $pid;
         if (!is_null(static::getPidPathColumn())) {
             $pid_path_array = false;
-            if ($item->hasCast(static::getPidPathColumn(), strtolower(Arr::class))) {
+            if ($item->hasCast(static::getPidPathColumn(), strtolower(Arr::class)) || $item->hasCast(static::getPidPathColumn(), Arr::class)) {
                 $pid_path_array = true;
             }
             $old_path_arr = $pid_path_array ? $item->{static::getPidPathColumn()} : (json_decode($item->{static::getPidPathColumn()}, true) ?: []);
